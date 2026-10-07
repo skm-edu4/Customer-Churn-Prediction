@@ -45,7 +45,7 @@ pip install numpy pandas scikit-learn matplotlib
 ### Installation & Usage
 
 ```bash
-git clone https://github.com/<your-username>/churn-ml-project.git
+git clone https://github.com/skm-edu4/churn-ml-project.git
 cd churn-ml-project
 python churn_project.py
 ```
