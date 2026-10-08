@@ -1,0 +1,44 @@
+seed: 42
+device: auto          # auto | cpu | cuda | mps
+
+data:
+  source: synthetic   # synthetic | telco
+  n_customers: 5000
+  telco_csv: data/raw/telco_customer_churn.csv
+  test_size: 0.20
+
+training:
+  cv_folds: 5
+  smote: true
+  torch:
+    hidden_dims: [64, 32]
+    dropout: 0.30
+    lr: 0.001
+    weight_decay: 0.0001
+    batch_size: 64
+    max_epochs: 60
+    patience: 8
+    loss: weighted_bce      # weighted_bce | focal
+    focal_gamma: 2.0
+  tabtransformer:
+    embed_dim: 16
+    n_heads: 4
+    n_layers: 2
+    mlp_hidden: 32
+    dropout: 0.10
+    lr: 0.0005
+    weight_decay: 0.0001
+    batch_size: 64
+    max_epochs: 60
+    patience: 8
+
+paths:
+  models: models
+  reports: reports
+  figures: reports/figures
+  tracking: mlruns
+
+evaluation:
+  thresholds: [0.30, 0.40, 0.50, 0.60]
+  calibration_bins: 10
+  shap_max_samples: 500

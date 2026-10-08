@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    env:
+      OMP_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Lint (ruff)
+        run: uv run ruff check src tests scripts
+
+      - name: Format check (ruff)
+        run: uv run ruff format --check src tests scripts
+
+      - name: Type check (mypy)
+        run: uv run mypy src/churn
+
+      - name: Tests (pytest, includes end-to-end pipeline test)
+        run: uv run pytest -q
+        # tests/test_pipeline_integration.py already runs
+        # scripts/train.py + evaluate.py + generate_report.py
+        # end-to-end against a reduced config, so no separate smoke step.
