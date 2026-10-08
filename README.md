@@ -104,6 +104,59 @@ flowchart TD
 - **Accuracy is the wrong metric here**: at threshold 0.5 the recall/precision trade-off is very different from 0.3 — see the threshold analysis in `reports/REPORT.md`.
 - Permutation importance says `contract_type` alone accounts for **−0.18 ROC-AUC** when shuffled; `total_charges` and `payment_method` add nothing once other features are known (correlation, not causation).
 
+## 📸 Screenshots
+
+### 1. Executing the pipeline
+
+**`make train`** — 5-fold CV across all candidates, torch training, model selection:
+
+![make train output](docs/screenshots/exec_01_train.png)
+
+**`make evaluate`** — held-out test metrics + permutation importance + 14 figures:
+
+![make evaluate output](docs/screenshots/exec_02_evaluate.png)
+
+### 2. Serving the model (FastAPI)
+
+**`curl` against the live API** — health, model info, and two opposite risk profiles:
+
+![API curl execution](docs/screenshots/exec_03_api_curl.png)
+
+**Interactive Swagger docs at `/docs`** — typed schemas, 422 validation, batch endpoint:
+
+![FastAPI Swagger UI](docs/screenshots/exec_04_fastapi_docs.png)
+
+### 3. Streamlit dashboard
+
+**Overview** — dataset, best model, live ROC-AUC:
+
+![Dashboard overview](docs/screenshots/exec_05_dashboard_overview.jpg)
+
+**Model comparison** — all 7 models, ROC/PR/calibration side by side:
+
+![Dashboard model comparison](docs/screenshots/exec_06_dashboard_models.jpg)
+
+**Risk calculator** — score a customer through the API and get a risk band:
+
+![Dashboard risk prediction](docs/screenshots/exec_07_dashboard_prediction.jpg)
+
+### 4. Evaluation & explainability figures
+
+| Figure | |
+|---|---|
+| EDA overview | ![EDA](docs/screenshots/01_eda.jpg) |
+| ROC curves (all models) | ![ROC](docs/screenshots/03_roc_curves.jpg) |
+| Calibration | ![Calibration](docs/screenshots/05_calibration.jpg) |
+| Confusion matrix (best model) | ![Confusion](docs/screenshots/06_confusion.jpg) |
+| Threshold trade-off | ![Threshold](docs/screenshots/07_threshold_curve.jpg) |
+| TabTransformer training curves | ![Training](docs/screenshots/09_history_tabtransformer.jpg) |
+| Learning curve (bias–variance) | ![Learning curve](docs/screenshots/10_learning_curve.jpg) |
+| Permutation importance | ![Permutation](docs/screenshots/12_permutation_importance.jpg) |
+| SHAP — tree model | ![SHAP tree](docs/screenshots/13_shap_tree.jpg) |
+| SHAP — PyTorch MLP (DeepExplainer) | ![SHAP deep](docs/screenshots/14_shap_deep_mlp.jpg) |
+
+> All screenshots were captured from the actual run (seed 42). Regenerate everything with `make pipeline`.
+
 ## 🧠 Skills & libraries map
 
 | Area | Where |
