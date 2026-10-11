@@ -23,9 +23,9 @@ from sklearn.decomposition import PCA
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from churn.config import load_config  # noqa: E402
-from churn.data import load_dataset  # noqa: E402
+from churn.data import TIME_COLUMN, load_dataset, train_test_frames  # noqa: E402
 from churn.evaluation import plots  # noqa: E402
-from churn.evaluation.metrics import compute_metrics, threshold_table  # noqa: E402
+from churn.evaluation.metrics import compute_metrics, cost_table, threshold_table  # noqa: E402
 from churn.explain.shap_analysis import (  # noqa: E402
     permutation_importance,
     shap_deep_summary,
@@ -37,7 +37,6 @@ from churn.models_io import (  # noqa: E402
     load_all_predictors,
 )
 from churn.training.torch_common import seed_everything  # noqa: E402
-from scripts_common import train_test_frames  # noqa: E402
 
 
 def _is_tree_pipeline(predictor) -> bool:
@@ -103,6 +102,42 @@ def main(argv: list[str] | None = None) -> int:
         plots.threshold_curve(
             y_true, best_proba, figures_dir / "07_threshold_curve.png", cfg.evaluation.thresholds
         ),
+    )
+
+    # concept drift: only meaningful when the generator injected it
+    drift_records = None
+    if cfg.data.temporal_drift != 0.0 and TIME_COLUMN in df.columns:
+        _track("drift", plots.temporal_drift_plot(df, figures_dir / "15_drift.png"))
+        by_month = df.groupby(TIME_COLUMN)["churned"].agg(["mean", "size"])
+        drift_records = [
+            {"month": int(m), "churn_rate": round(float(r["mean"]), 4), "rows": int(r["size"])}
+            for m, r in by_month.iterrows()
+        ]
+
+    # cost-sensitive decision analysis: where does the business optimum sit?
+    fp_cost = cfg.evaluation.costs.false_positive
+    fn_cost = cfg.evaluation.costs.false_negative
+    cost_df = cost_table(y_true, best_proba, fp_cost, fn_cost)
+    opt_row = cost_df.loc[cost_df["expected_cost"].idxmin()]
+    row_half = cost_df.iloc[int((cost_df["threshold"] - 0.5).abs().argmin())]
+    cost_analysis = {
+        "fp_cost": fp_cost,
+        "fn_cost": fn_cost,
+        "optimal_threshold": float(opt_row["threshold"]),
+        "cost_at_optimum": float(opt_row["expected_cost"]),
+        "cost_at_0_5": float(row_half["expected_cost"]),
+        "saving_vs_0_5": float(row_half["expected_cost"] - opt_row["expected_cost"]),
+        "cost_per_customer_at_optimum": float(opt_row["cost_per_customer"]),
+    }
+    _track(
+        "cost_curve",
+        plots.cost_curve(cost_df, figures_dir / "16_cost_curve.png", fp_cost, fn_cost),
+    )
+    print(
+        f"\n[cost] optimal threshold {cost_analysis['optimal_threshold']:.2f} → "
+        f"expected cost {cost_analysis['cost_at_optimum']:.0f} "
+        f"(vs {cost_analysis['cost_at_0_5']:.0f} at 0.50; "
+        f"saving {cost_analysis['saving_vs_0_5']:.0f})"
     )
 
     # torch training dynamics
@@ -205,6 +240,8 @@ def main(argv: list[str] | None = None) -> int:
     results["thresholds"] = threshold_table(y_true, best_proba, cfg.evaluation.thresholds).to_dict(
         orient="records"
     )
+    results["cost_analysis"] = cost_analysis
+    results["drift"] = drift_records
     results["permutation_importance"] = {k: round(float(v), 4) for k, v in pi.items()}
     results["figures"] = figs
     results["shap_notes"] = shap_notes

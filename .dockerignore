@@ -1,0 +1,26 @@
+# VCS + local environments
+.git
+.github
+.venv
+**/__pycache__
+
+# caches
+.mypy_cache
+.ruff_cache
+.pytest_cache
+
+# generated artefacts — mounted at runtime instead (see docker-compose.yml)
+models/
+reports/
+mlruns/
+data/
+
+# private / non-runtime files (never ship them in an image)
+INTERVIEW*.md
+PRIVATE*.md
+notes/
+docs/
+tests/
+
+# OS noise
+.DS_Store

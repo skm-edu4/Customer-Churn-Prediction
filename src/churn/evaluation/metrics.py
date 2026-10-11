@@ -79,3 +79,54 @@ def threshold_table(
             }
         )
     return pd.DataFrame(rows).round(4)
+
+
+def decision_cost(y_true: np.ndarray, y_pred: np.ndarray, fp_cost: float, fn_cost: float) -> float:
+    """Total business cost of a hard classification.
+
+    FP = offering retention to someone who was never going to leave (wasted
+    budget). FN = losing a customer who wanted to stay (lost lifetime value).
+    """
+    y_true = np.asarray(y_true).astype(int)
+    y_pred = np.asarray(y_pred).astype(int)
+    fp = int(((y_pred == 1) & (y_true == 0)).sum())
+    fn = int(((y_pred == 0) & (y_true == 1)).sum())
+    return fp * fp_cost + fn * fn_cost
+
+
+def cost_table(
+    y_true: np.ndarray,
+    y_proba: np.ndarray,
+    fp_cost: float,
+    fn_cost: float,
+    thresholds: np.ndarray | None = None,
+) -> pd.DataFrame:
+    """Expected cost at every point on a threshold grid.
+
+    Returns one row per threshold with the confusion counts split into their
+    cost components, so the caller can both plot the curve and pick the
+    cost-minimising threshold.
+    """
+    y_true = np.asarray(y_true).astype(int)
+    y_proba = np.asarray(y_proba).astype(float)
+    if thresholds is None:
+        thresholds = np.round(np.arange(0.05, 0.951, 0.01), 2)
+
+    rows = []
+    for t in thresholds:
+        y_pred = (y_proba >= t).astype(int)
+        fp = int(((y_pred == 1) & (y_true == 0)).sum())
+        fn = int(((y_pred == 0) & (y_true == 1)).sum())
+        rows.append(
+            {
+                "threshold": float(t),
+                "fp": fp,
+                "fn": fn,
+                "fp_cost_total": fp * fp_cost,
+                "fn_cost_total": fn * fn_cost,
+                "expected_cost": fp * fp_cost + fn * fn_cost,
+            }
+        )
+    table = pd.DataFrame(rows)
+    table["cost_per_customer"] = table["expected_cost"] / len(y_true)
+    return table

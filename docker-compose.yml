@@ -1,0 +1,73 @@
+# API + dashboard in containers.
+#
+# Prereq: trained artefacts exist on the host — `make pipeline` first, then:
+#
+#   docker compose up --build
+#
+#   API        → http://localhost:8000/docs
+#   Dashboard  → http://localhost:8501
+#
+# `models/` and `reports/` are bind-mounted read-only: the image ships code,
+# the host provides artefacts (keeps rebuilds cheap and images shareable).
+services:
+  api:
+    build: .
+    image: customer-churn:latest
+    container_name: churn-api
+    ports:
+      - "8000:8000"
+    environment:
+      CHURN_MODELS_DIR: /app/models
+    volumes:
+      - ./models:/app/models:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/app/.venv/bin/python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  dashboard:
+    build: .
+    image: customer-churn:latest
+    container_name: churn-dashboard
+    command:
+      [
+        "/app/.venv/bin/streamlit",
+        "run",
+        "dashboard/app.py",
+        "--server.address",
+        "0.0.0.0",
+        "--server.port",
+        "8501",
+        "--browser.gatherUsageStats",
+        "false",
+      ]
+    ports:
+      - "8501:8501"
+    environment:
+      CHURN_API_URL: http://api:8000
+    volumes:
+      - ./models:/app/models:ro
+      - ./reports:/app/reports:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/app/.venv/bin/python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=4)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

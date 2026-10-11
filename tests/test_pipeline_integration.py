@@ -48,6 +48,13 @@ evaluation:
   thresholds: [0.50]
   calibration_bins: 5
   shap_max_samples: 30
+  costs:
+    false_positive: 1.0
+    false_negative: 5.0
+benchmark:
+  warmup: 2
+  n_iter: 10
+  batch_sizes: [1, 8]
 """
 
 
@@ -70,7 +77,7 @@ def pipeline(tmp_path_factory) -> Path:
     config_path = root / "configs" / "default.yaml"
     config_path.write_text(SMALL_CONFIG)
 
-    for script in ("train.py", "evaluate.py", "generate_report.py"):
+    for script in ("train.py", "evaluate.py", "benchmark.py", "generate_report.py"):
         result = _run(script, config_path)
         assert result.returncode == 0, (
             f"{script} failed (rc={result.returncode})\n"
@@ -97,6 +104,27 @@ def test_results_contain_cv_and_test_metrics(pipeline: Path):
     assert results["torch"]["torch_mlp"]["epochs_run"] >= 1
 
 
+def test_cost_analysis_present_and_sane(pipeline: Path):
+    results = json.loads((pipeline / "models" / "results.json").read_text())
+    ca = results["cost_analysis"]
+    assert ca["fp_cost"] == 1.0 and ca["fn_cost"] == 5.0
+    assert 0.05 <= ca["optimal_threshold"] <= 0.95
+    assert ca["cost_at_optimum"] <= ca["cost_at_0_5"] + 1e-9, "optimum can't be worse than 0.5"
+
+
+def test_benchmark_artifacts_and_parity(pipeline: Path):
+    results = json.loads((pipeline / "models" / "results.json").read_text())
+    bench = results["benchmark"]
+    for name, diff in bench["parity_max_diff"].items():
+        assert diff < 5e-3, f"ONNX parity broken for {name}: {diff:.2e}"
+    assert len(bench["table"]) >= 7  # all bundle models + their ONNX twins
+    assert (pipeline / "reports" / "benchmark.md").exists()
+    onnx_files = list((pipeline / "models" / "onnx").glob("*.onnx"))
+    assert len(onnx_files) == 2, "both torch models must export"
+    assert "latency" in results["figures"]
+    assert (pipeline / results["figures"]["latency"]).exists()
+
+
 def test_all_figures_generated(pipeline: Path):
     results = json.loads((pipeline / "models" / "results.json").read_text())
     for key, rel in results["figures"].items():
@@ -108,6 +136,8 @@ def test_report_markdown(pipeline: Path):
     content = report.read_text()
     assert "Best model" in content
     assert "Held-out test results" in content
+    assert "Cost-sensitive threshold" in content
+    assert "Inference latency" in content
     assert "SHAP" in content
 
 

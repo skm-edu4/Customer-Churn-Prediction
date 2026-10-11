@@ -6,6 +6,8 @@ data:
   n_customers: 5000
   telco_csv: data/raw/telco_customer_churn.csv
   test_size: 0.20
+  split_strategy: random      # random | temporal (train on older cohorts, test on newer)
+  temporal_drift: 0.0         # log-odds drift across observation months (0 = original data)
 
 training:
   cv_folds: 5
@@ -31,6 +33,12 @@ training:
     batch_size: 64
     max_epochs: 60
     patience: 8
+  hpo:                      # Optuna search (or run `make hpo` / `train.py --hpo`)
+    enabled: false
+    families: [logistic_regression, xgboost, random_forest, gradient_boosting]
+    n_trials: 20
+    timeout_seconds: 600
+    cv_folds: 3
 
 paths:
   models: models
@@ -42,3 +50,11 @@ evaluation:
   thresholds: [0.30, 0.40, 0.50, 0.60]
   calibration_bins: 10
   shap_max_samples: 500
+  costs:                     # decision economics for the threshold analysis
+    false_positive: 1.0      # wasted retention offer
+    false_negative: 5.0      # lost customer (typically worth far more)
+
+benchmark:                   # scripts/benchmark.py (ONNX export + latency)
+  warmup: 10
+  n_iter: 200
+  batch_sizes: [1, 64]

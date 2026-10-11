@@ -24,7 +24,7 @@ from sklearn.model_selection import train_test_split
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from churn.config import load_config  # noqa: E402
-from churn.data import load_dataset  # noqa: E402
+from churn.data import load_dataset, train_test_frames  # noqa: E402
 from churn.features import TorchFeatureEncoder, build_sklearn_preprocessor  # noqa: E402
 from churn.models_io import (  # noqa: E402
     save_sklearn_predictor,
@@ -38,10 +38,10 @@ from churn.training.baselines import (  # noqa: E402
     cross_validate_candidates,
     fit_candidates,
 )
+from churn.training.hpo import tune_families  # noqa: E402
 from churn.training.tab_transformer import train_tabtransformer  # noqa: E402
 from churn.training.torch_common import seed_everything  # noqa: E402
 from churn.training.torch_mlp import train_mlp  # noqa: E402
-from scripts_common import train_test_frames  # noqa: E402
 
 
 def _dense(Z) -> np.ndarray:
@@ -51,9 +51,12 @@ def _dense(Z) -> np.ndarray:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=None, help="Path to YAML config")
+    parser.add_argument("--hpo", action="store_true", help="Force-enable Optuna HPO for this run")
     args = parser.parse_args(argv)
 
     cfg = load_config(args.config)
+    if args.hpo:
+        cfg.training.hpo.enabled = True
     seed_everything(cfg.seed)
     models_dir = cfg.models_dir
     models_dir.mkdir(parents=True, exist_ok=True)
@@ -63,14 +66,27 @@ def main(argv: list[str] | None = None) -> int:
     X_train, X_test, y_train, y_test = train_test_frames(df, cfg)
     print(
         f"[data] {len(df)} rows | train {len(X_train)} | test {len(X_test)} | "
-        f"churn rate {df['churned'].mean():.1%}"
+        f"split {cfg.data.split_strategy} | churn rate {df['churned'].mean():.1%}"
     )
 
     tracker = Tracker(cfg)
     tracker.start("churn-v2-baselines")
 
+    # ------------------------------------------- optional Optuna HPO search
+    hpo_params: dict[str, dict] = {}
+    if cfg.training.hpo.enabled:
+        print(
+            f"\n[hpo] Optuna search: {cfg.training.hpo.n_trials} trials × "
+            f"{len(cfg.training.hpo.families)} families "
+            f"({', '.join(cfg.training.hpo.families)})"
+        )
+        hpo_params = tune_families(X_train, y_train, cfg.training.hpo, cfg.seed, tracker=tracker)
+        (models_dir / "hpo_best_params.json").write_text(json.dumps(hpo_params, indent=2))
+        for family, params in hpo_params.items():
+            print(f"[hpo] {family}: {params}")
+
     # ------------------------------------------- classical CV + final fits
-    candidates = build_candidates(cfg.seed)
+    candidates = build_candidates(cfg.seed, overrides=hpo_params)
     cv = cross_validate_candidates(candidates, X_train, y_train, cfg.training.cv_folds, cfg.seed)
     print("\n[cv] 5-fold cross-validation:")
     print(cv.to_string())
@@ -182,7 +198,10 @@ def main(argv: list[str] | None = None) -> int:
             "churn_rate": round(float(df["churned"].mean()), 4),
             "train_rows": int(len(X_train)),
             "test_rows": int(len(X_test)),
+            "split_strategy": cfg.data.split_strategy,
+            "temporal_drift": cfg.data.temporal_drift,
         },
+        "hpo": hpo_params or None,
         "cv": cv.reset_index().to_dict(orient="records"),
         "scores": {k: round(v, 4) for k, v in scores.items()},
         "best": best,

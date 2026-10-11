@@ -286,3 +286,88 @@ def feature_importance_plot(
     ax.set_title(title)
     fig.tight_layout()
     return _save(fig, path)
+
+
+# ---------------------------------------------------------------------------
+# Decision economics, drift and latency
+# ---------------------------------------------------------------------------
+def cost_curve(cost_df: pd.DataFrame, path: str | Path, fp_cost: float, fn_cost: float) -> Path:
+    """Expected business cost across thresholds, with the FP/FN breakdown."""
+    opt = cost_df.iloc[int(cost_df["expected_cost"].argmin())]
+    fig, ax = plt.subplots(figsize=(8.5, 5.5))
+
+    ax.plot(
+        cost_df["threshold"],
+        cost_df["fn_cost_total"],
+        color="tomato",
+        lw=1.5,
+        ls="--",
+        label=f"FN cost (lost customer × {fn_cost:g})",
+    )
+    ax.plot(
+        cost_df["threshold"],
+        cost_df["fp_cost_total"],
+        color="steelblue",
+        lw=1.5,
+        ls="--",
+        label=f"FP cost (wasted offer × {fp_cost:g})",
+    )
+    ax.plot(
+        cost_df["threshold"],
+        cost_df["expected_cost"],
+        color="black",
+        lw=2.5,
+        label="total expected cost",
+    )
+    ax.axvline(
+        opt["threshold"],
+        color="seagreen",
+        lw=2,
+        label=(
+            f"cost-optimal threshold = {opt['threshold']:.2f} (cost {opt['expected_cost']:.0f})"
+        ),
+    )
+    ax.axvline(0.5, color="gray", lw=1, ls=":", label="default threshold 0.50")
+    ax.set_xlabel("decision threshold")
+    ax.set_ylabel("expected cost (currency units)")
+    ax.set_title("Cost-sensitive threshold selection")
+    ax.legend(fontsize=9, loc="upper center")
+    fig.tight_layout()
+    return _save(fig, path)
+
+
+def temporal_drift_plot(df: pd.DataFrame, path: str | Path) -> Path:
+    """Churn rate and cohort size per observation month (concept drift)."""
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
+
+    rate = df.groupby("observation_month")["churned"].mean()
+    rate.plot(ax=axes[0], color="tomato", marker="o", lw=2)
+    z = np.polyfit(rate.index.to_numpy(), rate.to_numpy(), 1)
+    axes[0].plot(rate.index, np.polyval(z, rate.index.to_numpy()), "k--", lw=1, label="trend")
+    axes[0].set_ylim(0, max(0.05, rate.max() * 1.3))
+    axes[0].set_title("Churn rate by observation month")
+    axes[0].set_ylabel("churn rate")
+    axes[0].legend()
+
+    counts = df.groupby("observation_month").size()
+    counts.plot.bar(ax=axes[1], color="steelblue", rot=0)
+    axes[1].set_title("Customers observed per month")
+    axes[1].set_ylabel("rows")
+
+    fig.suptitle("Concept drift: recent cohorts churn more", y=1.02, fontsize=13)
+    fig.tight_layout()
+    return _save(fig, path)
+
+
+def latency_benchmark_plot(bench_df: pd.DataFrame, path: str | Path) -> Path:
+    """Grouped bars of p50 inference latency (log scale) per model/batch."""
+    fig, ax = plt.subplots(figsize=(9, 0.65 * len(bench_df) + 2.5))
+    plot_df = bench_df.set_index("model")[[c for c in bench_df.columns if c.startswith("p50_")]]
+    plot_df.columns = [c.replace("p50_", "batch ") for c in plot_df.columns]
+    plot_df.sort_values(plot_df.columns[0]).plot.barh(ax=ax, color=["mediumpurple", "goldenrod"])
+    ax.set_xscale("log")
+    ax.set_xlabel("p50 latency per call (ms, log scale)")
+    ax.set_title("Inference latency: eager vs ONNX Runtime")
+    ax.legend(title="")
+    fig.tight_layout()
+    return _save(fig, path)

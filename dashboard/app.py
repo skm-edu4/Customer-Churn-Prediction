@@ -138,6 +138,7 @@ with tab_overview:
         """
     )
     _fig("cv_comparison", "Cross-validated model comparison")
+    _fig("drift", "Concept drift — churn rate by observation month")
 
 with tab_models:
     st.subheader("Cross-validation (training set)")
@@ -171,6 +172,29 @@ with tab_models:
         _fig("confusion", "Confusion matrix (best model)")
     _fig("threshold", "Threshold trade-off")
     _fig("learning_curve", "Learning curve")
+
+    ca = results.get("cost_analysis")
+    if ca:
+        st.subheader("Cost-sensitive decision threshold")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Cost-optimal threshold", f"{ca['optimal_threshold']:.2f}")
+        c2.metric("Expected cost @ optimum", f"{ca['cost_at_optimum']:.0f}")
+        c3.metric("Saving vs 0.50", f"{ca['saving_vs_0_5']:.0f}")
+        st.caption(
+            f"FP cost {ca['fp_cost']:g} (wasted offer) · "
+            f"FN cost {ca['fn_cost']:g} (lost customer)"
+        )
+        _fig("cost_curve", "Expected cost across thresholds")
+
+    bench = results.get("benchmark")
+    if bench:
+        st.subheader("Inference latency (eager PyTorch vs ONNX Runtime)")
+        st.dataframe(
+            _table(bench["table"], [c for c in bench["table"][0]
+                                    if c.startswith(("p50_", "p95_", "rows_s_"))]),
+            use_container_width=True,
+        )
+        _fig("latency", "p50 latency by model and batch size")
 
     hist_key = f"history_{best}"
     if hist_key in results.get("figures", {}):
@@ -256,8 +280,10 @@ Multi-model pipeline:
 - imbalanced-learn (SMOTE)
 - PyTorch MLP + TabTransformer
 
-Plus SHAP explainability, MLflow tracking,
-FastAPI serving and this dashboard.
+Plus Optuna HPO, hybrid evaluation with
+cost-based thresholds, SHAP explainability,
+ONNX export + latency benchmarks, MLflow
+tracking, FastAPI serving, Docker and this dashboard.
 """
 )
 if results:

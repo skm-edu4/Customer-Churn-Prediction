@@ -1,6 +1,6 @@
 [project]
 name = "customer-churn-prediction"
-version = "2.0.0"
+version = "2.1.0"
 description = "Production-grade customer churn prediction: sklearn + PyTorch, SHAP explainability, FastAPI service and Streamlit dashboard."
 readme = "README.md"
 license = { text = "MIT" }
@@ -25,6 +25,9 @@ dependencies = [
     "pyyaml>=6.0",
     "joblib>=1.4",
     "typer>=0.12",
+    "optuna>=5.0.0",
+    "onnx>=1.23.2",
+    "onnxruntime>=1.31.0",
 ]
 
 [dependency-groups]
