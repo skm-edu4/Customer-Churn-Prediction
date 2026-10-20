@@ -1,13 +1,13 @@
 # 📉 Customer Churn Prediction — Production-Grade ML System
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Hugging%20Face-FFD21E.svg)](https://huggingface.co/spaces/skm-edu4/customer-churn)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Hugging%20Face-FFD21E.svg)](https://huggingface.co/spaces/skm-edu/customer-churn)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.x-EE4C2C.svg)](https://pytorch.org/)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-1.x-F7931E.svg)](https://scikit-learn.org/)
 [![CI](https://github.com/skm-edu4/Customer-Churn-Prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/skm-edu4/Customer-Churn-Prediction/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **🟢 Live:** [**huggingface.co/spaces/skm-edu4/customer-churn**](https://huggingface.co/spaces/skm-edu4/customer-churn) — the whole system (Streamlit dashboard + FastAPI) running in one container. No install, no setup: open the link and use the risk calculator. Auto-deploys from `main` via GitHub Actions.
+> **🟢 Live:** [**huggingface.co/spaces/skm-edu/customer-churn**](https://huggingface.co/spaces/skm-edu/customer-churn) — the whole system (Streamlit dashboard + FastAPI) running in one container. No install, no setup: open the link and use the risk calculator. Auto-deploys from `main` via GitHub Actions.
 
 > **Seven models, one pipeline, zero leakage** — a structured ML system that compares classical ML (LogReg, Random Forest, Gradient Boosting), XGBoost, an imbalanced-learn SMOTE variant, and two from-scratch PyTorch models (MLP + TabTransformer), then evaluates, explains, cost-optimises and serves the winner behind a FastAPI endpoint, a Streamlit dashboard, a Docker Compose stack and a **public cloud deployment on Hugging Face Spaces** — with ONNX export + latency benchmarks to prove it's fast.
 
@@ -232,7 +232,7 @@ not automatically "faster": you benchmark, you don't assume. Full table
 The same image — FastAPI + Streamlit together, models baked in at build time —
 runs as a **public Docker Space**:
 
-**👉 [huggingface.co/spaces/skm-edu4/customer-churn](https://huggingface.co/spaces/skm-edu4/customer-churn)**
+**👉 [huggingface.co/spaces/skm-edu/customer-churn](https://huggingface.co/spaces/skm-edu/customer-churn)**
 
 - **Single container**: `scripts/deploy_entrypoint.sh` starts the API on
   loopback `:8000` and Streamlit publicly on `:7860`; the dashboard calls the
