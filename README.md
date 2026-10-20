@@ -1,12 +1,15 @@
 # 📉 Customer Churn Prediction — Production-Grade ML System
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Hugging%20Face-FFD21E.svg)](https://huggingface.co/spaces/skm-edu4/customer-churn)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.x-EE4C2C.svg)](https://pytorch.org/)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-1.x-F7931E.svg)](https://scikit-learn.org/)
 [![CI](https://github.com/skm-edu4/Customer-Churn-Prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/skm-edu4/Customer-Churn-Prediction/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **Seven models, one pipeline, zero leakage** — a structured ML system that compares classical ML (LogReg, Random Forest, Gradient Boosting), XGBoost, an imbalanced-learn SMOTE variant, and two from-scratch PyTorch models (MLP + TabTransformer), then evaluates, explains, cost-optimises and serves the winner behind a FastAPI endpoint, a Streamlit dashboard and a Docker Compose stack — with ONNX export + latency benchmarks to prove it's fast.
+> **🟢 Live:** [**huggingface.co/spaces/skm-edu4/customer-churn**](https://huggingface.co/spaces/skm-edu4/customer-churn) — the whole system (Streamlit dashboard + FastAPI) running in one container. No install, no setup: open the link and use the risk calculator. Auto-deploys from `main` via GitHub Actions.
+
+> **Seven models, one pipeline, zero leakage** — a structured ML system that compares classical ML (LogReg, Random Forest, Gradient Boosting), XGBoost, an imbalanced-learn SMOTE variant, and two from-scratch PyTorch models (MLP + TabTransformer), then evaluates, explains, cost-optimises and serves the winner behind a FastAPI endpoint, a Streamlit dashboard, a Docker Compose stack and a **public cloud deployment on Hugging Face Spaces** — with ONNX export + latency benchmarks to prove it's fast.
 
 ---
 
@@ -41,7 +44,8 @@ A production-style ML system rather than a notebook:
    parity check (max |Δ| ≈ 1e-07) plus a p50/p95 latency benchmark.
 6. **Delivery** — best model behind a **FastAPI** REST contract, an interactive
    **Streamlit** dashboard, MLflow experiment tracking, a Markdown report, a
-   **Docker Compose** stack (API + dashboard), 53 tests and GitHub Actions CI.
+   **Docker Compose** stack (API + dashboard), a **public cloud deployment**
+   on Hugging Face Spaces with auto-deploy CI, 53 tests and GitHub Actions CI.
 
 **The outcome.**
 - Best model **Logistic Regression: test ROC-AUC 0.781, PR-AUC 0.658**
@@ -65,7 +69,8 @@ A production-style ML system rather than a notebook:
 - **Fast to serve**: ONNX Runtime matches eager PyTorch to **1.2e-07** and
   runs the TabTransformer ~17% faster at batch size 1 (0.290 vs 0.349 ms).
 - Fully reproducible: `make setup && make pipeline` in minutes, no API keys,
-  no downloads.
+  no downloads — and **live for anyone**: one link on Hugging Face Spaces
+  runs the whole system in a container built from this repo alone.
 
 ## 🎯 What this project does
 
@@ -77,7 +82,7 @@ A production-style ML system rather than a notebook:
 6. **Visualises** everything with 16 matplotlib/seaborn figures (ROC, PR, calibration, thresholds, cost curve, learning curves, clusters…)
 7. **Exports & benchmarks** both torch models to ONNX with a parity check and p50/p95 latency table
 8. **Tracks** experiments in MLflow and emits a Markdown evaluation report
-9. **Serves** the best model over REST (FastAPI), a live risk calculator (Streamlit) and a **Docker Compose** stack
+9. **Serves** the best model over REST (FastAPI), a live risk calculator (Streamlit) and a **Docker Compose** stack — plus a **public cloud deployment on Hugging Face Spaces** that auto-deploys from `main`
 10. **Guarantees** quality with 53 tests (unit + end-to-end) and GitHub Actions CI
 
 ## 🏗️ Architecture
@@ -105,6 +110,7 @@ flowchart TD
     J -.->|fallback| D
     I --> L["docker compose up<br/>one image, two services (api + dashboard)"]
     J --> L
+    L --> M["Hugging Face Spaces<br/>public live demo · auto-deploy from main<br/>(GH Actions → deploy-hf.yml)"]
 ```
 
 ## 📊 Results (seed 42, 5,000 rows, 36.1% churn rate)
@@ -221,7 +227,25 @@ not automatically "faster": you benchmark, you don't assume. Full table
 
 ![docker compose execution](docs/screenshots/exec_09_docker.png)
 
-### 5. Evaluation & explainability figures
+### 5. Live on Hugging Face Spaces
+
+The same image — FastAPI + Streamlit together, models baked in at build time —
+runs as a **public Docker Space**:
+
+**👉 [huggingface.co/spaces/skm-edu4/customer-churn](https://huggingface.co/spaces/skm-edu4/customer-churn)**
+
+- **Single container**: `scripts/deploy_entrypoint.sh` starts the API on
+  loopback `:8000` and Streamlit publicly on `:7860`; the dashboard calls the
+  API in-container.
+- **Self-contained image**: the pipeline (train → evaluate → benchmark →
+  report) runs *inside* `docker build`, so the image needs no mounts and
+  reproduces the published numbers from code + seed alone.
+- **CPU-only wheels**: torch resolves from the official CPU index (uv
+  `[[tool.uv.index]]`), so the image never pulls the ~3 GB CUDA stack.
+- **Auto-deploy**: `.github/workflows/deploy-hf.yml` pushes `main` to the
+  Space on every merge (needs one `HF_TOKEN` repo secret).
+
+### 6. Evaluation & explainability figures
 
 | Figure | |
 |---|---|
@@ -258,7 +282,8 @@ not automatically "faster": you benchmark, you don't assume. Full table
 | **MLflow** | `tracking.py` — params/metrics/artifacts to a local file store |
 | **FastAPI / pydantic** | `serving/` — typed request contract, validation, 422s, batch endpoint, OpenAPI docs |
 | **Streamlit** | `dashboard/app.py` — EDA, model comparison, explainability, live scoring |
-| **Docker** | `Dockerfile` + `docker-compose.yml` — one image, two services, artefacts bind-mounted ro, health-gated startup |
+| **Docker** | `Dockerfile` + `docker-compose.yml` — one image, two modes (single-container deploy on :7860, or compose api+dashboard), artefacts baked in at build, health-gated startup |
+| **Deployment / CI-CD** | `.github/workflows/deploy-hf.yml` — auto-deploys `main` to a Hugging Face Docker Space; `deploy/hf_space_readme.md` is the Space landing page |
 | **Testing / CI** | `tests/` (53 tests incl. end-to-end), ruff, mypy, GitHub Actions matrix 3.11/3.12 |
 | **Packaging** | `pyproject.toml` + uv, src layout, Makefile, typed config (pydantic + YAML) |
 
@@ -285,10 +310,13 @@ Customer-Churn-Prediction/
 │   ├── explain/shap_analysis.py  # SHAP + permutation importance
 │   └── serving/                  # FastAPI app + pydantic schemas
 ├── scripts/                      # train · evaluate · benchmark · generate_report
+│                                 #   + deploy_entrypoint.sh (single-container mode)
+├── deploy/hf_space_readme.md     # landing page shown on the HF Space
 ├── dashboard/app.py              # Streamlit
 ├── tests/                        # 53 tests incl. end-to-end + ONNX/HPO units
 ├── .github/workflows/ci.yml      # ruff → mypy → pytest on 3.11 & 3.12
-├── Dockerfile                    # one image → api + dashboard services
+├── .github/workflows/deploy-hf.yml  # main → Hugging Face Spaces (auto-deploy)
+├── Dockerfile                    # one image → :7860 combined, or api + dashboard via compose
 ├── docker-compose.yml
 ├── Makefile
 └── reports/                      # generated: figures + REPORT.md + benchmark.md
@@ -309,11 +337,14 @@ make serve                 # FastAPI  → http://localhost:8000/docs
 make dashboard             # Streamlit → http://localhost:8501
 ```
 
-Or the same two services in containers (after `make pipeline` has produced
-`models/`, which compose bind-mounts read-only):
+Or the same two services in containers — the image bakes the trained models
+in at build time, so **no local pipeline run is needed**:
 
 ```bash
-docker compose up --build   # API → :8000, dashboard → :8501 (health-gated startup)
+docker compose up --build      # API → :8000, dashboard → :8501 (health-gated startup)
+# or the single-container mode exactly as deployed on HF Spaces:
+docker build -t customer-churn .
+docker run -p 7860:7860 customer-churn
 ```
 
 No API keys, no downloads — the dataset is generated deterministically from `seed`.
@@ -381,8 +412,11 @@ TPE with a seeded sampler makes HPO itself reproducible — but it still changes
 **ONNX export — what actually broke (good debugging story):**
 Torch 2.14 defaults to the dynamo exporter; for the two-input TabTransformer it silently baked a static batch dim (`[1, k]` traced — batch 1 worked, batch 400 crashed in ONNX Runtime). Pinning the legacy exporter (`dynamo=False`) fixed that — which then failed on `aten::_transformer_encoder_layer_fwd`: bisecting grad/no-grad × output-name variants showed `torch.no_grad()` was the trigger (without grad mode the tracer takes TransformerEncoder's fused fast-path, which has no ONNX symbolic). Removed the wrapper, pinned and documented both constraints in `export/onnx_export.py`. Verification on every run: max |Δ| eager-vs-ORT = **1.19e-07**, asserted in unit tests and reported by `make benchmark`. And the benchmark keeps everyone honest: ONNX wins ~17% at batch 1 but *loses* at batch 64 here — export is not automatically faster.
 
-**Docker: one image, two commands — and no baked-in models.**
-`Dockerfile` ships code only; `docker-compose.yml` bind-mounts `./models` and `./reports` **read-only**. Retraining = restart, not rebuild; the API container can't be mutated at runtime; the image is shareable without artefacts. Dependencies layer-cache (`uv sync --no-install-project` first), runtime uses plain venv binaries (no package manager at runtime), non-root user, healthchecks on `/health` and Streamlit's `/_stcore/health`, and the dashboard waits on `service_healthy` so it never races the API. The private `INTERVIEW_NOTES.md` is excluded by both `.gitignore` and `.dockerignore` — it ships in neither git nor the image.
+**Docker: one image, two run modes — and artefacts baked in, not shipped in git.**
+The default CMD runs **both services in one container** (`scripts/deploy_entrypoint.sh`: API on loopback `:8000`, Streamlit public on `:7860`) — that's the shape Hugging Face Spaces (and most PaaS) require. `docker-compose.yml` overrides the command per service for local two-container dev. Trained artefacts are **baked in at build time**: the pipeline runs inside `docker build` from the deterministic seed, so the image is fully self-contained (`docker run -p 7860:7860 <image>` works with zero mounts) and reproducible from code alone — `models/` stays out of git. For local iteration compose still bind-mounts `./models` and `./reports` **read-only** over the baked copies: retrain = `make train` + restart, no rebuild. Dependencies layer-cache (`uv sync --no-install-project` first), torch resolves from the **official CPU wheel index** (uv `[[tool.uv.index]]`) so no CUDA stack is ever pulled, runtime uses plain venv binaries (no package manager at runtime), non-root user, healthchecks on `/health` and Streamlit's `/_stcore/health`, and the dashboard waits on `service_healthy` so it never races the API. The private `INTERVIEW_NOTES.md` is excluded by both `.gitignore` and `.dockerignore` — it ships in neither git nor the image.
+
+**CI/CD that ends at a URL, not a green checkmark.**
+`deploy-hf.yml` mirrors `main` to a Hugging Face Docker Space and lets the platform build the image; the Space's landing page (`deploy/hf_space_readme.md`) is swapped in at push time so the GitHub README and the Space README each serve their audience. One `HF_TOKEN` repo secret is the entire setup — forks are skipped explicitly (no secrets there), and a concurrency group prevents two deploys racing.
 
 **The macOS dual-libomp workaround (read this if you port the repo):**
 `xgboost` links `@rpath/libomp.dylib` while PyTorch bundles its *own* `libomp.dylib`. In one process, two OpenMP runtimes deadlock (or segfault) inside their barriers. `churn/__init__.py` pins `OMP_NUM_THREADS=1` before either library loads — negligible cost at this data size, and the reason the pipeline is stable on macOS. See the comment there for details.
@@ -405,7 +439,7 @@ make test        # 53 tests, ~2 min
 - `test_api.py` — FastAPI contract: health, model-info, 422 validation, batch, 503 without a model
 - `test_pipeline_integration.py` — runs `train.py` → `evaluate.py` → `benchmark.py` → `generate_report.py` end-to-end in a temp dir (cost + benchmark artefacts asserted)
 
-CI (`.github/workflows/ci.yml`) runs ruff → ruff-format → mypy → pytest on **Python 3.11 and 3.12**.
+CI (`.github/workflows/ci.yml`) runs ruff → ruff-format → mypy → pytest on **Python 3.11 and 3.12**. Deployment is a second workflow (`.github/workflows/deploy-hf.yml`): every push to `main` mirrors the repo to the Hugging Face Space, which rebuilds the image and rolls out the live demo.
 
 ## 🔮 Roadmap
 
@@ -413,6 +447,7 @@ CI (`.github/workflows/ci.yml`) runs ruff → ruff-format → mypy → pytest on
 - [x] Optuna hyperparameter search replacing the manual grids — `training/hpo.py`, opt-in via `make hpo`
 - [x] ONNX export for the torch models + latency benchmark — `make benchmark`, parity asserted in tests
 - [x] Dockerfile + docker-compose for API + dashboard — one image, two services, health-gated
+- [x] **Public cloud deployment** — Hugging Face Spaces (Docker SDK), auto-deploy from `main` via GitHub Actions, models baked into the image at build time
 - [x] Cost-sensitive thresholding (explicit false-positive / false-negative prices) — `evaluation/metrics.py: cost_table`
 - [ ] DVC for dataset/versioned experiments *(skipped: the dataset is seed-generated from config — DVC would version a file that's already reproducible; revisit if a curated/real dataset with manual annotations lands)*
 

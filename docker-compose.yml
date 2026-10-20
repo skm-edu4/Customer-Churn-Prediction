@@ -1,19 +1,30 @@
 # API + dashboard in containers.
 #
-# Prereq: trained artefacts exist on the host — `make pipeline` first, then:
-#
 #   docker compose up --build
 #
 #   API        → http://localhost:8000/docs
 #   Dashboard  → http://localhost:8501
 #
-# `models/` and `reports/` are bind-mounted read-only: the image ships code,
-# the host provides artefacts (keeps rebuilds cheap and images shareable).
+# The image bakes trained artefacts in at build time (so it also runs
+# standalone as a single container on :7860 — that's the deployed mode on
+# Hugging Face Spaces). For local iteration the host's `models/` and
+# `reports/` are bind-mounted read-only over the baked copies: retrain with
+# `make train` and restart, no rebuild needed. Run `make pipeline` once
+# before the first `docker compose up` so the bind mounts aren't empty.
 services:
   api:
     build: .
     image: customer-churn:latest
     container_name: churn-api
+    command:
+      [
+        "/app/.venv/bin/uvicorn",
+        "churn.serving.api:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+      ]
     ports:
       - "8000:8000"
     environment:

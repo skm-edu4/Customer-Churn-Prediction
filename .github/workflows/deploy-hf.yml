@@ -1,0 +1,92 @@
+# Deploys the live demo to Hugging Face Spaces on every push to main.
+#
+# The Space is a Docker space built from this same repo — one container,
+# FastAPI + Streamlit (see scripts/deploy_entrypoint.sh), models baked in
+# at build time. Requires one repo secret:
+#
+#   HF_TOKEN  — a Hugging Face access token with "write" scope
+#               (https://huggingface.co/settings/tokens/new)
+#
+# The first run creates the Space if it doesn't exist yet.
+name: Deploy to Hugging Face Spaces
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never run on forks (no secrets there anyway) and never let two deploys
+# race each other.
+concurrency:
+  group: deploy-hf-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Secrets are unavailable to forks; skip quietly rather than fail.
+    if: github.repository_owner == 'skm-edu4'
+    steps:
+      # Full history: we force-push this clone to the Space remote, and git
+      # rejects pushes from a shallow clone.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve Space identity from the token
+        id: who
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "::error::HF_TOKEN secret is not set — see .github/workflows/deploy-hf.yml header"
+            exit 1
+          fi
+          USER=$(curl -sf -H "Authorization: Bearer $HF_TOKEN" \
+            https://huggingface.co/api/whoami-v2 | jq -r .name)
+          echo "user=$USER" >> "$GITHUB_OUTPUT"
+          echo "space=$USER/customer-churn" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure the Space exists (Docker SDK)
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer $HF_TOKEN" \
+            "https://huggingface.co/api/spaces/${{ steps.who.outputs.space }}")
+          if [ "$CODE" = "404" ]; then
+            curl -sf -X POST \
+              -H "Authorization: Bearer $HF_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://huggingface.co/api/spaces" \
+              -d "{\"name\":\"${{ steps.who.outputs.space }}\",\"sdk\":\"docker\",\"public\":true}" \
+              > /dev/null
+            echo "created Space ${{ steps.who.outputs.space }}"
+          else
+            echo "Space exists (HTTP $CODE)"
+          fi
+
+      - name: Stage the Space tree (full repo + Space landing README)
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USER: ${{ steps.who.outputs.user }}
+        run: |
+          # The Space's README gets Docker-SDK frontmatter + a short "try it"
+          # landing page; the GitHub README stays untouched. Everything else
+          # (code, Dockerfile, configs) is pushed as-is.
+          cp deploy/hf_space_readme.md README.md
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "Space landing page" --quiet || true
+          # Credentials go in the one-off push URL only (never written to
+          # .git/config); GitHub Actions masks the secret in logs.
+          git push --force \
+            "https://${HF_USER}:${HF_TOKEN}@huggingface.co/spaces/${{ steps.who.outputs.space }}" \
+            HEAD:main
+
+      - name: Trigger build and report the URL
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          echo "Pushed — Space building at https://huggingface.co/spaces/${{ steps.who.outputs.space }}"

@@ -1,6 +1,6 @@
 [project]
 name = "customer-churn-prediction"
-version = "2.1.0"
+version = "2.2.0"
 description = "Production-grade customer churn prediction: sklearn + PyTorch, SHAP explainability, FastAPI service and Streamlit dashboard."
 readme = "README.md"
 license = { text = "MIT" }
@@ -49,6 +49,18 @@ packages = ["src/churn"]
 
 [tool.uv]
 default-groups = ["dev"]
+
+# torch resolves from the official CPU wheel index (not PyPI). PyPI's Linux
+# torch wheel hard-requires the full CUDA runtime (nvidia-*, ≈ 3 GB of GPU
+# wheels) at import time; the CPU index ships clean CPU-only wheels for every
+# platform, which keeps `uv sync` lean locally, in CI, and in the Docker image.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
 
 [tool.ruff]
 line-length = 100
